@@ -13,16 +13,11 @@ from scipy.signal import savgol_filter
 import xlsxwriter as xw
 import os
 import pandas as pd
-
 from pykalman import KalmanFilter
 
 
-""" To change file change in data_visualize; DP_GMM """
 
-""" ##################################################################### """
-
-
-'''#################################################### translation velocity Euclidean Distance ####################'''
+'''###################### translation velocity Euclidean Distance ####################'''
 def safe_concatenate(X, W):
     """
     Checks if X is None before concatenating W
@@ -77,7 +72,7 @@ def KALMAN_filter(measurement1,measurement2,n):
 
 
 
-def maxminnorm(array):
+def max_min_norm(array):
     maxcols = array.max(axis=0)
     mincols = array.min(axis=0)
     data_shape = array.shape
@@ -94,14 +89,14 @@ def eucldist_vectorized(coords1, coords2):
     return np.sqrt(np.sum((coords2 - coords1) ** 2))
 
 
-def two_trans_eudist(translation):
+def trans_eudist(translation):
     translation = np.array(translation).astype(float).reshape(-1, 3) * 1000
     eudist = [0 for _ in range(int(len(translation) - 1))]
     for index in range(0, len(eudist)):
         eudist_res = eucldist_vectorized(translation[index], translation[index + 1])
         eudist[index] = eudist_res
     eudist = np.array(eudist).reshape(-1, 1)
-    eudistance_norm = maxminnorm(eudist).reshape(-1, 1)
+    eudistance_norm = max_min_norm(eudist).reshape(-1, 1)
     return eudistance_norm
 
 
@@ -115,7 +110,7 @@ def quaternion(rotation_matrix):
     return qua
 
 
-def two_rot_eudist(rotation):
+def rot_eudist(rotation):
     counter = 0
     qua = []
     # dist_rot = [0 for _ in range((int(len(rotation) / 9)))]
@@ -127,12 +122,12 @@ def two_rot_eudist(rotation):
             qua.append(quaternion(rotation[counter: counter + 9]))
             if len(qua) > 1:
                 # a [0]= np.arccos(2 * np.inner(qua[i], qua[i - 1]) ** 2 - 1)
-                dist_rot.append( (np.arccos(2 * np.inner(qua[-1], qua[-2]) ** 2 - 1)) )
+                dist_rot.append((np.arccos(2 * np.inner(qua[-1], qua[-2]) ** 2 - 1)) )
                 # dist_rot[counter - 1] = np.arccos(2 * np.inner(qua[counter], qua[counter - 1]) ** 2 - 1)
             counter = counter + 9
     dist_rot = np.array(dist_rot).reshape(-1, 1)
     dist_rot = np.nan_to_num(dist_rot)
-    dist_rot_norm = maxminnorm(dist_rot).reshape(-1, 1)
+    dist_rot_norm = max_min_norm(dist_rot).reshape(-1, 1)
     return dist_rot_norm
 
 
@@ -232,13 +227,12 @@ def calculate_var(new_tf, new_rf):
     var_transy = np.array(trans_y.var(axis=0))
     var_transz = np.array(trans_z.var(axis=0))
     var_trans = var_transx + var_transy + var_transz
-    var_trans_norm = maxminnorm(var_trans.reshape(-1, 1))
+    var_trans_norm = max_min_norm(var_trans.reshape(-1, 1))
     var_rotx = np.array(rot_x.var(axis=0))
     var_roty = np.array(rot_y.var(axis=0))
     var_rotz = np.array(rot_z.var(axis=0))
     var_rot = var_rotx + var_roty + var_rotz
-    var_rot_norm = maxminnorm(var_rot.reshape(-1, 1))
-    print('finish')
+    var_rot_norm = max_min_norm(var_rot.reshape(-1, 1))
     return var_trans_norm, var_rot_norm
 
 
@@ -266,178 +260,176 @@ def segment_connect_acc(start_ind, end_ind, distance, axnum):
         connecty = [distance[start_point+1], distance[end_point+1]]
         axnum.plot(connectx, connecty, 'm--')
 
+
+def get_seg_label(kinematic_filename):
+    start = []
+    end = []
+    seg_label = open(rootPath + "transcriptions/" + kinematic_filename, "r")
+    for lines in seg_label.readlines():
+        # print(lines)
+        column = lines.split(" ")
+        column = [i for i in column if (len(str(i)) != 0)]
+        start.append(column[0])
+        end.append(column[1])
+    start = np.array(start).astype(int)
+    end = np.array(end).astype(int)
+    end = np.delete(end, [-1])
+    return start, end
+
+
+def get_kinematic_data():
+    translation_left, rotation_left, rot_vleft, trans_vleft, grip_vleft = [], [], [], [], []
+    translation_right, rotation_right, rot_vright, trans_vright, grip_vright = [], [], [], [], []
+    kinematics_filepath = open(filePath + kinematics_file)
+    for lines in kinematics_filepath.readlines():
+        # print(lines)
+        column = lines.split(" ")
+        column = [i for i in column if (len(str(i)) != 0)]
+        for line in column[0:3]:  ## translation
+            translation_left.append(line)
+        for line in column[3:12]:  ## rotation matrix
+            rotation_left.append(line)
+        for line in column[12:15]:
+            trans_vleft.append(line)
+        for line in column[15:18]:
+            rot_vleft.append(line)
+        for line in column[18]:
+            grip_vleft.append(line)
+
+        for line in column[19:22]:  ## translation for right hand
+            translation_right.append(line)
+        for line in column[22:31]:  ## rotation matrix for right hand
+            rotation_right.append(line)
+        for line in column[31:34]:
+            trans_vright.append(line)
+        for line in column[34:37]:
+            rot_vright.append(line)
+        for line in column[37]:
+            grip_vright.append(line)
+    print(len(translation_left) / 3)
+    return translation_left, rotation_left, trans_vleft,\
+           translation_right, rotation_right, trans_vright
+
+
+def data_filters(trans_data, rot_data, trans_vdata):
+    trans_data, trans_v_data = KALMAN_filter(trans_data, trans_vdata, 6)
+    eudist_norm, dist_rot_norm\
+        = trans_rot_eudistance(trans_data, rot_data)
+    # dist_rot_norm = np.concatenate((dist_rot_norm_l, dist_rot_norm_r), axis=1)
+    dist_rot_filter = sav_filter(dist_rot_norm, 321, 1)
+    eudist_filter = sav_filter(eudist_norm, 59,2)
+    return eudist_filter, dist_rot_filter
+
+
+def sav_filter(data, window_length, polyorder):
+    data = data.flatten()
+    output = savgol_filter(data, window_length, polyorder)
+    return output
+
+
+def trans_rot_eudistance(trans, rot):
+    eudistance_norm = trans_eudist(trans)
+    distance_rot_norm = rot_eudist(rot)
+    return eudistance_norm, distance_rot_norm
+
+
+def plot_figs(indxdata_dict, trans_data_dict, fig_name, fig_path):
+    fig = plt.figure(figsize=(40,15))
+    i = 0
+    for dict1, dict2 in zip(indxdata_dict.items(),trans_data_dict.items() ):
+        ax = fig.add_subplot(2,2,i+1)
+        plt.plot(dict2[1][10:], color='#6495ED')
+        a = [dict1[0]]
+        plt.legend(a, fontsize=20)
+        ax.plot(dict1[1], dict2[1][dict1[1]], "xr", ms=8)
+        segment_connect(start_timestamp, end_timestamp, dict2[1], ax)
+
+        plt.xlabel('frame', fontsize=20)
+        plt.ylabel('normalized distance', fontsize=20)
+        i += 1
+    plt.savefig(fig_path + fig_name[0:-4])
+    plt.clf()
+    plt.close()
+
+
+
 ############################################
 if __name__ == '__main__':
-    file_org = "./result figures/original trans rot/"
-    file_var = "./result figures/variation trans rot/"
-    file_neg_org = "./result figures/negative original trans rot/"
-    if not os.path.exists(file_org):
-        # os.mkdir创建一个，os.makedirs可以创建路径上多个
-        os.makedirs(file_org)
-    if not os.path.exists(file_var):
-        os.makedirs(file_var)
-    if not os.path.exists(file_neg_org):
-        os.makedirs(file_neg_org)
+    homepath = os.getcwd() + "/"
+    img_org_path = "./result figures/original trans rot/"
+    img_var_path = "./result figures/variation trans rot/"
+    img_neg_org_path = "./result figures/negative original trans rot/"
+    res_file = "./result file/"
+    dst_files = [img_org_path, img_var_path, img_neg_org_path, res_file]
+    for dst in dst_files:
+        if not os.path.exists(dst):
+            # build files/dir if not exist
+            os.makedirs(dst)
+
+    fileName = "./result file/potensial segment points.xls"  # 工作簿名字
+    workbook = xw.Workbook(fileName)
 
 
     tasks = ['Suturing', 'Needle Passing', 'Knot Tying']
     for task in tasks:
-        rootPath = task + '/'
+        rootPath = homepath + task + '/'
         filePath = rootPath + "kinematics/AllGestures/"
-        all_filename = os.listdir(filePath)
-        all_filename.sort()
+        gesture_filename = os.listdir(filePath)
+        gesture_filename.sort()
+  # 创建工作簿
 
-        fileName = "./result file/potensial segment points.xls"  # 工作簿名字
-        workbook = xw.Workbook(fileName)  # 创建工作簿
+        for kinematics_file in gesture_filename[::10]:
+            print(kinematics_file)
+            start_timestamp, end_timestamp = get_seg_label(kinematics_file)
 
-        for n in all_filename[::10]:
-            print(n)
-            start = []
-            end = []
-            seg_label = open(rootPath + "transcriptions/" + n, "r")
-            f1 = open(filePath + n)
-            print('working with file：', n)
-            for lines in seg_label.readlines():
-                # print(lines)
-                column = lines.split(" ")
-                column = [i for i in column if (len(str(i)) != 0)]
-                start.append(column[0])
-                end.append(column[1])
+            ''' ############### read trans and rot data for left and right hand #######'''
+            translation_l, rotation_l, trans_vl, translation_r, rotation_r, trans_vr = get_kinematic_data()
 
-            start = np.array(start).astype(int)
-            end = np.array(end).astype(int)
-            end = np.delete(end, [-1])
-            ''' ############### read trans and rot data for left and right hand ###'''
-            translation_l, rotation_l, rot_vl, trans_vl, grip_vl = [], [], [], [], []
-            translation_r, rotation_r, rot_vr, trans_vr, grip_vr = [], [], [], [], []
+            eudist_norm_l, dist_rot_norm_l = data_filters(translation_l, rotation_l, trans_vl)
+            dist_rot_norm_r,eudist_norm_r =  data_filters(translation_r, rotation_r, trans_vr)
 
-            for lines in f1.readlines():
-                # print(lines)
-                column = lines.split(" ")
-                column = [i for i in column if (len(str(i)) != 0)]
-                for line in column[0:3]:  ## translation
-                    translation_l.append(line)
-                for line in column[3:12]:  ## rotation matrix
-                    rotation_l.append(line)
-                for line in column[12:15]:
-                    trans_vl.append(line)
-                for line in column[15:18]:
-                    rot_vl.append(line)
-                for line in column[18]:
-                    grip_vl.append(line)
-
-                for line in column[19:22]:  ## translation for right hand
-                    translation_r.append(line)
-                for line in column[22:31]:  ## rotation matrix for right hand
-                    rotation_r.append(line)
-                for line in column[31:34]:
-                    trans_vr.append(line)
-                for line in column[34:37]:
-                    rot_vr.append(line)
-                for line in column[37]:
-                    grip_vr.append(line)
-
-            print(len(translation_l) / 3)
-
-
-
-            translation_l,trans_vl= KALMAN_filter(translation_l,trans_vl,6)
-            translation_r,trans_vr = KALMAN_filter(translation_r,trans_vr,6)
-            print('Done kalman filter')
-
-            eudist_norm_l = two_trans_eudist(translation_l)
-            eudist_norm_r = two_trans_eudist(translation_r)
-            eudist_norm = np.concatenate((eudist_norm_l, eudist_norm_r), axis=1)
-
-
-            dist_rot_norm_l = two_rot_eudist(rotation_l)
-            dist_rot_norm_r = two_rot_eudist(rotation_r)
-            dist_rot_norm = np.concatenate((dist_rot_norm_l, dist_rot_norm_r), axis=1)
-
-            dist_rot_norm_l = dist_rot_norm_l.flatten()
-            dist_rot_norm_l = savgol_filter(dist_rot_norm_l,321, 1)
-            dist_rot_norm_r = dist_rot_norm_r.flatten()
-            dist_rot_norm_r = savgol_filter(dist_rot_norm_r, 321, 1)
-
-            eudist_norm_l = eudist_norm_l.flatten()
-            eudist_norm_l = savgol_filter(eudist_norm_l, 59, 2)
-            eudist_norm_r = eudist_norm_r.flatten()
-            eudist_norm_r = savgol_filter(eudist_norm_r, 59, 2)
-
-            ''' #########################trans_index, trans_index_cwt, rot_index, rot_index_cwt ##################'''
+            ''' ################ trans_index, trans_index_cwt, rot_index, rot_index_cwt ##################'''
             trans_peakl_ind, trans_peakl_indcwt, rot_peakl_ind, rot_peakl_indcwt = find_org_peaks(eudist_norm_l,
                                                                                                   dist_rot_norm_l)
             trans_peakr_ind, trans_peakr_indcwt, rot_peakr_ind, rot_peakr_indcwt = find_org_peaks(eudist_norm_r,
                                                                                                   dist_rot_norm_r)
 
-            negeudist_norm_l = maxminnorm((-eudist_norm_l).reshape(-1, 1))
-            negeudist_norm_r = maxminnorm(-eudist_norm_r.reshape(-1, 1))
-            negrot_norm_l = maxminnorm((-dist_rot_norm_l).reshape(-1, 1))
-            negrot_norm_r = maxminnorm((-dist_rot_norm_r).reshape(-1, 1))
+            negeudist_norm_l = max_min_norm((-eudist_norm_l).reshape(-1, 1))
+            negeudist_norm_r = max_min_norm(-eudist_norm_r.reshape(-1, 1))
+            negrot_norm_l = max_min_norm((-dist_rot_norm_l).reshape(-1, 1))
+            negrot_norm_r = max_min_norm((-dist_rot_norm_r).reshape(-1, 1))
 
-            trans_peakl_ind1, trans_peakl_indcwt1, rot_peakl_ind1, rot_peakl_indcwt1 = find_neg_org_peaks(negeudist_norm_l,negrot_norm_l)
-            trans_peakr_ind1, trans_peakr_indcwt1, rot_peakr_ind1, rot_peakr_indcwt1 = find_neg_org_peaks(negeudist_norm_r,negrot_norm_r)
-            # negeudist_norm_r = eudist_norm_r.reshape(-1, 1)
+            trans_peakl_ind1, trans_peakl_indcwt1, rot_peakl_ind1, rot_peakl_indcwt1 \
+                = find_neg_org_peaks(negeudist_norm_l,negrot_norm_l)
+            trans_peakr_ind1, trans_peakr_indcwt1, rot_peakr_ind1, rot_peakr_indcwt1 \
+                = find_neg_org_peaks(negeudist_norm_r,negrot_norm_r)
 
-
-            fig3 = plt.figure(figsize=(40, 15))
-            ax3 = plt.subplot(221)
-            plt.plot(eudist_norm_l[10:], color='#6495ED')
-            ax3.plot(trans_peakl_indcwt, eudist_norm_l[trans_peakl_indcwt], "xr", ms=8)
-            segment_connect(start, end, eudist_norm_l, ax3)
-            plt.legend(['left translation distance cwt'],fontsize = 20)
-            plt.xlabel('frame',fontsize = 20)
-            plt.ylabel('normalized distance',fontsize = 20)
-
-            ax3 = plt.subplot(222)
-            plt.plot(eudist_norm_r[10:], color='#6495ED')
-            ax3.plot(trans_peakr_indcwt, eudist_norm_r[trans_peakr_indcwt], "xr", ms=8)
-            segment_connect(start, end, eudist_norm_r, ax3)
-            plt.legend(['right translation distance cwt'],fontsize = 20)
-            plt.xlabel('frame',fontsize = 20)
-            plt.ylabel('normalized distance',fontsize = 20)
-
-            ax3 = plt.subplot(223)
-            plt.plot(dist_rot_norm_l[10:], color='#6495ED');
-            ax3.plot(rot_peakl_indcwt, dist_rot_norm_l[rot_peakl_indcwt], "xr", ms=8)
-            plt.legend(['left rotation distance cwt'],fontsize = 20)
-            segment_connect(start, end, dist_rot_norm_l, ax3)
-            plt.xlabel('frame',fontsize = 20)
-            plt.ylabel('normalized distance',fontsize = 20)
-
-            ax3 = plt.subplot(224)
-            plt.plot(dist_rot_norm_r[10:], color='#6495ED')
-            ax3.plot(rot_peakr_indcwt, dist_rot_norm_r[rot_peakr_indcwt], "xr", ms=8)
-            segment_connect(start, end, dist_rot_norm_r, ax3)
-            plt.xlabel('frame')
-            plt.ylabel('normalized distance')
-            plt.legend(['right rotation distance cwt'],fontsize = 20)
-            plt.xlabel('frame',fontsize = 20)
-            plt.ylabel('normalized distance',fontsize = 20)
-
-            name = n[0:-4]
-            plt.savefig(file_org + 'org trans rot cwt_' + n[0:-4])
-
-            plt.clf()
-            plt.close()
+            indxcwt_dict = {"left translation distance cwt":trans_peakl_indcwt,
+                            "right translation distance cwt":trans_peakr_indcwt,
+                            "left rotation distance cwt":rot_peakl_indcwt,
+                            "right rotation distance cwt":rot_peakr_indcwt}
+            indxorg_dict = {"trans_peakl":trans_peakl_ind, "trans_peakr":trans_peakr_ind,
+                            "rot_peakl":rot_peakl_ind,"rot_peakr":rot_peakr_ind}
+            data_dict = {"left translation data":eudist_norm_l,
+                         "right translation data":eudist_norm_r,
+                         "left rotation data": dist_rot_norm_l,
+                         "right rotation data": dist_rot_norm_r
+                         }
+            fig_name = kinematics_file[0:-4] + 'org trans rot cwt_'
+            plot_figs(indxcwt_dict, data_dict, fig_name, img_org_path )
 
             '''##########################          variance-based              ##################'''
             ## define one new frame
             new_trans_l, new_rot_l = generate_new_frames(50, translation_l, rotation_l)
             new_trans_r, new_rot_r = generate_new_frames(50, translation_r, rotation_r)
 
-            var_transl_norm, var_rotl_norm = calculate_var(new_trans_l, new_rot_l)
-            var_transr_norm, var_rotr_norm = calculate_var(new_trans_r, new_rot_r)
+            var_transl, var_rotl = calculate_var(new_trans_l, new_rot_l)
+            var_transr, var_rotr = calculate_var(new_trans_r, new_rot_r)
 
-            var_rotl_norm = var_rotl_norm.flatten()
-            var_rotl_norm = savgol_filter(var_rotl_norm, 89, 3)
-            var_rotr_norm = var_rotr_norm.flatten()
-            var_rotr_norm = savgol_filter(var_rotr_norm, 89, 3)
-
-            var_transl_norm = var_transl_norm.flatten()
-            var_transl_norm = savgol_filter(var_transl_norm, 89, 3)
-            var_transr_norm = var_transr_norm.flatten()
-            var_transr_norm = savgol_filter(var_transr_norm, 89, 3)
+            var_rotl_norm = sav_filter(var_rotl, 89, 3)
+            var_rotr_norm = sav_filter(var_rotr, 89, 3)
+            var_transl_norm = sav_filter(var_transl, 89, 3)
+            var_transr_norm = sav_filter(var_transr, 89, 3)
 
             '''##########################          variance-based -  plot left hand           ##################'''
             var_trans_peakl_ind, var_trans_peakl_indcwt, var_rot_peakl_ind, var_rot_peakl_indcwt = find_var_peak(
@@ -445,102 +437,34 @@ if __name__ == '__main__':
             var_trans_peakr_ind, var_trans_peakr_indcwt, var_rot_peakr_ind, var_rot_peakr_indcwt = find_var_peak(
                 var_transr_norm, var_rotr_norm)
 
-            ############################################################################################33
-
             nt = -var_transl_norm
             nr = -var_rotl_norm
-            var_transl_negnorm = maxminnorm(nt.reshape(-1, 1))
-            var_rotl_negnorm = maxminnorm(nr.reshape(-1, 1))
-            var_transr_negnorm = maxminnorm((-var_transr_norm).reshape(-1, 1))
-            var_rotr_negnorm = maxminnorm((-var_rotr_norm).reshape(-1, 1))
+            var_transl_negnorm = max_min_norm(nt.reshape(-1, 1))
+            var_rotl_negnorm = max_min_norm(nr.reshape(-1, 1))
+            var_transr_negnorm = max_min_norm((-var_transr_norm).reshape(-1, 1))
+            var_rotr_negnorm = max_min_norm((-var_rotr_norm).reshape(-1, 1))
 
-            var_trans_peakl_negind, var_trans_peakl_negindcwt, var_rot_peakl_negind, var_rot_peakl_negindcwt = find_var_peak(
-                var_transl_negnorm, var_rotl_negnorm)
-            var_trans_peakr_negind, var_trans_peakr_negindcwt, var_rot_peakr_negind, var_rot_peakr_negindcwt = find_var_peak(
-                var_transr_negnorm, var_rotr_negnorm)
+            var_trans_peakl_negind, var_trans_peakl_negindcwt, var_rot_peakl_negind, var_rot_peakl_negindcwt \
+                = find_var_peak(var_transl_negnorm, var_rotl_negnorm)
+            var_trans_peakr_negind, var_trans_peakr_negindcwt, var_rot_peakr_negind, var_rot_peakr_negindcwt \
+                = find_var_peak(var_transr_negnorm, var_rotr_negnorm)
 
-    ##########################
+            var_indx_dict = {"left translation variance cwt":var_trans_peakl_indcwt,
+                            "right translation variance cwt":var_trans_peakr_indcwt,
+                            "negative left variance var cwt":var_trans_peakl_negindcwt,
+                            "negative right variance var cwt":var_trans_peakr_negindcwt}
 
-            fig6 = plt.figure(figsize=(40, 15))
-            ax6 = plt.subplot(221)
-            ax6.plot(var_transl_norm)
-            ax6.plot(var_trans_peakl_indcwt, var_transl_norm[var_trans_peakl_indcwt], 'xr');
-            segment_connect(start, end, var_transl_norm, ax6);
-            plt.legend(['rotation var left cwt'],fontsize = 20)
-            plt.xlabel('frame',fontsize = 20)
-            plt.ylabel('normalized distance',fontsize = 20)
+            var_data_dict = {"left variance data":var_transl_norm,
+                             "right variance data":var_transr_norm,
+                             "left variance data": var_transl_negnorm,
+                             "right variance data": var_transr_negnorm
+                             }
+            fig_name = kinematics_file[0:-4] + 'trans var cwt'
+            plot_figs(indxcwt_dict, data_dict, fig_name, img_var_path)
 
-            ax6 = plt.subplot(222)
-            ax6.plot(var_transr_norm)
-            ax6.plot(var_trans_peakr_indcwt, var_transr_norm[var_trans_peakr_indcwt], 'xr');
-            segment_connect(start, end, var_transr_norm, ax6);
-            plt.legend(['translation var right cwt'],fontsize = 20)
-            plt.xlabel('frame',fontsize = 20)
-            plt.ylabel('normalized distance',fontsize = 20)
+            """#############################    write in file  ######################"""
 
-            ax6 = plt.subplot(223)
-            ax6.plot(var_transl_norm)
-            ax6.plot(var_trans_peakl_ind, var_transl_norm[var_trans_peakl_ind], 'xr');
-            segment_connect(start, end, var_transl_norm, ax6);
-            plt.legend(['translation var left'],fontsize = 20)
-            plt.xlabel('frame',fontsize = 20)
-            plt.ylabel('normalized distance',fontsize = 20)
-
-            ax6 = plt.subplot(224)
-            ax6.plot(var_transr_norm)
-            ax6.plot(var_trans_peakr_ind, var_transr_norm[var_trans_peakr_ind], 'xr');
-            segment_connect(start, end, var_transr_norm, ax6);
-            plt.legend(['translation var right'],fontsize = 20)
-            plt.xlabel('frame',fontsize = 20)
-            plt.ylabel('normalized distance',fontsize = 20)
-
-
-            plt.savefig(file_var + 'trans var' + n[0:-4])
-
-            plt.clf()
-            plt.close()
-            ####################################333
-            fig = plt.figure(figsize=(40, 15))
-            ax5 = plt.subplot(221)
-            ax5.plot(var_rotl_norm)
-            ax5.plot(var_rot_peakl_indcwt, var_rotl_norm[var_rot_peakl_indcwt], 'xr');
-            segment_connect(start, end, var_rotl_norm, ax5);
-            plt.legend(['rotation var left cwt'],fontsize = 20)
-            plt.xlabel('frame',fontsize = 20)
-            plt.ylabel('normalized distance',fontsize = 20)
-
-            ax5 = plt.subplot(222)
-            ax5.plot(var_rotr_norm)
-            ax5.plot(var_rot_peakr_indcwt, var_rotr_norm[var_rot_peakr_indcwt], 'xr');
-            segment_connect(start, end, var_rotr_norm, ax5);
-            plt.legend(['rotation var right cwt'],fontsize = 20)
-            plt.xlabel('frame',fontsize = 20)
-            plt.ylabel('normalized distance',fontsize = 20)
-
-            ax5 = plt.subplot(223)
-            ax5.plot(var_rotl_negnorm)
-            ax5.plot(var_rot_peakl_negindcwt, var_rotl_negnorm[var_rot_peakl_negindcwt], 'xr');
-            segment_connect(start, end, var_rotl_negnorm, ax5);
-            plt.legend(['negative rotation var left cwt'],fontsize = 20)
-            plt.xlabel('frame',fontsize = 20)
-            plt.ylabel('normalized distance',fontsize = 20)
-
-            ax5 = plt.subplot(224)
-            ax5.plot(var_rotr_negnorm)
-            ax5.plot(var_rot_peakr_negindcwt, var_rotr_negnorm[var_rot_peakr_negindcwt], 'xr')
-            segment_connect(start, end, var_rotr_negnorm, ax5)
-            plt.xlabel('frame',fontsize = 20)
-            plt.ylabel('normalized distance',fontsize = 20)
-            plt.legend(['negative rotation var right cwt'],fontsize = 20)
-
-            plt.savefig(file_var + 'negvar cwt' + n[0:-4])
-
-            plt.clf()
-            plt.close()
-
-            """#############################    write in file  ##############"""
-
-            worksheet1 = workbook.add_worksheet(n[0:-4])  # 创建子表
+            worksheet1 = workbook.add_worksheet(kinematics_file[0:-4])  # 创建子表
             worksheet1.activate()  # 激活表
 
             head_data = np.array(
@@ -551,14 +475,13 @@ if __name__ == '__main__':
                 'var_trans_peakl_indcwt', 'var_trans_peakl_negindcwt', 'var_rot_peakl_ind', 'var_rot_peakl_negind',
                 'var_trans_peakr_indcwt', 'var_trans_peakr_negindcwt', 'var_rot_peakr_ind', 'var_rot_peakr_negind'])
 
-            # all_data = [] 　
             all_data = [trans_peakl_ind, trans_peakr_ind, rot_peakl_ind, rot_peakr_ind,
-                        trans_peakl_indcwt, trans_peakr_indcwt, rot_peakl_indcwt, rot_peakr_indcwt, #8
-                        start,
+                        trans_peakl_indcwt, trans_peakr_indcwt, rot_peakl_indcwt, rot_peakr_indcwt,  #8
+                        start_timestamp,
                         var_rot_peakl_indcwt, var_rot_peakl_negindcwt, var_rot_peakr_indcwt, var_rot_peakr_negindcwt,
-                        rot_peakl_indcwt1, rot_peakr_indcwt1, #14,15
+                        rot_peakl_indcwt1, rot_peakr_indcwt1,  #14,15
                         var_trans_peakl_indcwt, var_trans_peakl_negindcwt, var_rot_peakl_ind, var_rot_peakl_negind,
-                        var_trans_peakr_indcwt, var_trans_peakr_negindcwt, var_rot_peakr_ind, var_rot_peakr_negind ]
+                        var_trans_peakr_indcwt, var_trans_peakr_negindcwt, var_rot_peakr_ind, var_rot_peakr_negind]
 
 
             transl_ind = np.concatenate((trans_peakl_ind, trans_peakl_indcwt))
@@ -568,9 +491,7 @@ if __name__ == '__main__':
             for d in all_data:
                 write_excel(worksheet1, d, column_num)
                 column_num += 1
-
             worksheet1.write_row("A1", head_data)
 
-        workbook.close()
+    workbook.close()
 
-        # plt.show()
