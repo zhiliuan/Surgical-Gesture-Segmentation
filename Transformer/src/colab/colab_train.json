@@ -1,0 +1,38 @@
+{
+    "name": "Gesture Recognition",
+    "dataset": "Briareo",
+    "epochs": 80,
+    "phase": "train",
+    "data": {
+      "optical_flow": false,
+      "type": "suturing",
+      "n_classes": 15,
+      "n_frames": 20,
+      "data_path": "/content/TransformerBasedGestureRecognition/suturing/train_step1/",
+      "result_dir": "./self/result",
+      "batch_size": 1
+    },
+    "checkpoints": {
+      "save_policy": "best",
+      "save_name": "train_briareo",
+      "save_dir": "./self/checkpoints/",
+      "save_iters": 30,
+      "tb_path": "./self/train_log"
+    },
+    "solver": {
+      "type": "AdamW",
+      "workers": 0,
+      "weight_decay": 0.0001,
+      "base_lr": 0.0001,
+      "decay_steps": [50, 75]
+    },
+    "network":{
+      "backbone": "resnet",
+      "pretrained": true,
+      "ff_size": 1024,
+      "n_head": 8,
+      "dropout2d" : 0.1,
+      "dropout1d": 0.5,
+      "n_module": 6
+    }
+}
