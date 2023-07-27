@@ -3,6 +3,7 @@ from sklearn import cluster
 import cv2
 
 import matplotlib
+
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,9 +16,9 @@ import os
 import pandas as pd
 from pykalman import KalmanFilter
 
-
-
 '''###################### translation velocity Euclidean Distance ####################'''
+
+
 def safe_concatenate(X, W):
     """
     Checks if X is None before concatenating W
@@ -28,48 +29,47 @@ def safe_concatenate(X, W):
     else:
         return np.vstack((X, W))
 
-def KALMAN_filter(measurement1,measurement2,n):
+
+def KALMAN_filter(measurement1, measurement2, n):
     cor = None
     v = None
     measurement1 = np.array(measurement1, np.float32).reshape(-1, 3)
     measurement2 = np.array(measurement2, np.float32).reshape(-1, 3)
     kalman = cv2.KalmanFilter(6, n)
-    kalman.transitionMatrix = np.array([ [1,0,0,1,0,0],
-        [0,1,0,0,1,0],
-        [0,0,1,0,0,1],
-        [0,0,0,1,0,0],
-       [ 0,0,0,0,1,0],
-        [0,0,0,0,0,1] ], np.float32)  # 转移矩阵 A
-    kalman.measurementMatrix = np.array([[1,0,0,1,0,0],
-        [0,1,0,0,1,0],
-        [0,0,1,0,0,1],
-        [0,0,0,1,0,0],
-       [ 0,0,0,0,1,0],
-        [0,0,0,0,0,1] ], np.float32)  # 测量矩阵    H
-    kalman.measurementNoiseCov = np.array([[1,0,0,0,0,0],
-        [0,1,0,0,0,0],
-        [0,0,1,0,0,0],
-        [0,0,0,1,0,0],
-        [0,0,0,0,1,0],
-        [0,0,0,0,0,1]], np.float32) * 100  # 测量噪声        R
-    kalman.processNoiseCov = np.array([[1,0,0,0,0,0],
-        [0,1,0,0,0,0],
-        [0,0,1,0,0,0],
-        [0,0,0,1,0,0],
-        [0,0,0,0,1,0],
-        [0,0,0,0,0,1]], np.float32)* 1e-5  # 过程噪声 Q
-    measurement = np.hstack((measurement1,measurement2))
+    kalman.transitionMatrix = np.array([[1, 0, 0, 1, 0, 0],
+                                        [0, 1, 0, 0, 1, 0],
+                                        [0, 0, 1, 0, 0, 1],
+                                        [0, 0, 0, 1, 0, 0],
+                                        [0, 0, 0, 0, 1, 0],
+                                        [0, 0, 0, 0, 0, 1]], np.float32)  # 转移矩阵 A
+    kalman.measurementMatrix = np.array([[1, 0, 0, 1, 0, 0],
+                                         [0, 1, 0, 0, 1, 0],
+                                         [0, 0, 1, 0, 0, 1],
+                                         [0, 0, 0, 1, 0, 0],
+                                         [0, 0, 0, 0, 1, 0],
+                                         [0, 0, 0, 0, 0, 1]], np.float32)  # 测量矩阵    H
+    kalman.measurementNoiseCov = np.array([[1, 0, 0, 0, 0, 0],
+                                           [0, 1, 0, 0, 0, 0],
+                                           [0, 0, 1, 0, 0, 0],
+                                           [0, 0, 0, 1, 0, 0],
+                                           [0, 0, 0, 0, 1, 0],
+                                           [0, 0, 0, 0, 0, 1]], np.float32) * 100  # 测量噪声        R
+    kalman.processNoiseCov = np.array([[1, 0, 0, 0, 0, 0],
+                                       [0, 1, 0, 0, 0, 0],
+                                       [0, 0, 1, 0, 0, 0],
+                                       [0, 0, 0, 1, 0, 0],
+                                       [0, 0, 0, 0, 1, 0],
+                                       [0, 0, 0, 0, 0, 1]], np.float32) * 1e-5  # 过程噪声 Q
+    measurement = np.hstack((measurement1, measurement2))
     for i in range(len(measurement)):
-
         mes = np.reshape(measurement[i, :], (n, 1))
-    # measurement = np.array([[np.float32(x)], [np.float32(y)]])
+        # measurement = np.array([[np.float32(x)], [np.float32(y)]])
         c = kalman.correct(mes)
         # cor.append(c)
         current_prediction = kalman.predict()
         cor = safe_concatenate(cor, current_prediction.flatten()[0:3])
         v = safe_concatenate(v, current_prediction.flatten()[3:6])
-    return cor,v
-
+    return cor, v
 
 
 def max_min_norm(array):
@@ -118,11 +118,11 @@ def rot_eudist(rotation):
     eps = 1e-6
     # rotation distance
     for index in range(len(rotation)):
-        while counter < len(rotation)-9:
+        while counter < len(rotation) - 9:
             qua.append(quaternion(rotation[counter: counter + 9]))
             if len(qua) > 1:
                 # a [0]= np.arccos(2 * np.inner(qua[i], qua[i - 1]) ** 2 - 1)
-                dist_rot.append((np.arccos(2 * np.inner(qua[-1], qua[-2]) ** 2 - 1)) )
+                dist_rot.append((np.arccos(2 * np.inner(qua[-1], qua[-2]) ** 2 - 1)))
                 # dist_rot[counter - 1] = np.arccos(2 * np.inner(qua[counter], qua[counter - 1]) ** 2 - 1)
             counter = counter + 9
     dist_rot = np.array(dist_rot).reshape(-1, 1)
@@ -135,34 +135,37 @@ def rot_eudist(rotation):
 def find_org_peaks(org_trans, org_rot):
     # org_trans = maxminnorm((-org_trans).reshape(-1, 1))
     # org_rot = maxminnorm((-org_rot).reshape(-1, 1))
-    trans_index, _ = find_peaks(org_trans.flatten(), prominence=[0.05,0.5], height = 0.2) # height = 0.05
-    trans_index_cwt = find_peaks_cwt(org_trans.flatten(), widths=np.arange(1,300)) # 原来（50，300）
+    trans_index, _ = find_peaks(org_trans.flatten(), prominence=[0.05, 0.5], height=0.2)  # height = 0.05
+    trans_index_cwt = find_peaks_cwt(org_trans.flatten(), widths=np.arange(1, 300))  # 原来（50，300）
 
     rot_index, _ = find_peaks(org_rot.flatten(), distance=60, prominence=0.1)
-    rot_index_cwt = find_peaks_cwt(org_rot.flatten(), widths=np.arange(1, 300))# 原来（50，300）
+    rot_index_cwt = find_peaks_cwt(org_rot.flatten(), widths=np.arange(1, 300))  # 原来（50，300）
 
     return trans_index, trans_index_cwt, rot_index, rot_index_cwt
+
 
 def find_neg_org_peaks(org_trans, org_rot):
     # org_trans = maxminnorm((-org_trans).reshape(-1, 1))
     # org_rot = maxminnorm((-org_rot).reshape(-1, 1))
-    trans_index, _ = find_peaks(org_trans.flatten(), prominence=[0.05,0.5], height = 0.8) # height = 0.05
-    trans_index_cwt = find_peaks_cwt(org_trans.flatten(), widths=np.arange(1,300)) # 原来（50，300）
+    trans_index, _ = find_peaks(org_trans.flatten(), prominence=[0.05, 0.5], height=0.8)  # height = 0.05
+    trans_index_cwt = find_peaks_cwt(org_trans.flatten(), widths=np.arange(1, 300))  # 原来（50，300）
 
     rot_index, _ = find_peaks(org_rot.flatten(), distance=60, prominence=0.1)
-    rot_index_cwt = find_peaks_cwt(org_rot.flatten(), widths=np.arange(1, 300))# 原来（50，300）
+    rot_index_cwt = find_peaks_cwt(org_rot.flatten(), widths=np.arange(1, 300))  # 原来（50，300）
 
     return trans_index, trans_index_cwt, rot_index, rot_index_cwt
+
 
 def segment_connect(start_ind, end_ind, distance, axnum):
     for segments in range(len(end_ind)):
         start_point = start_ind[segments]
         end_point = end_ind[segments]
-        axnum.plot(start_point+1, distance[start_point+1], "ro", ms=5)
-        axnum.plot(end_point+1, distance[end_point+1], "mo", ms=5)
-        connectx = [start_point+1, end_point+1]
-        connecty = [distance[start_point+1], distance[end_point+1]]
-        axnum.plot(connectx, connecty, 'm--')
+        gt, = axnum.plot(start_point + 1, distance[start_point + 1], "ro", ms=5)
+        axnum.plot(end_point + 1, distance[end_point + 1], "mo", ms=5)
+        connectx = [start_point + 1, end_point + 1]
+        connecty = [distance[start_point + 1], distance[end_point + 1]]
+        seg_connect, = axnum.plot(connectx, connecty, 'm--')
+    return seg_connect, gt,
 
 
 def new_trans(translation_orig, n, Transf):
@@ -238,11 +241,12 @@ def calculate_var(new_tf, new_rf):
 
 def find_var_peak(var_transdata, var_rotdata):
     trans_mean = var_transdata.mean()
-    var_trans_peak_ind, _ = find_peaks(var_transdata.flatten(), prominence = [0.4,1],height=trans_mean + 0.2, distance = 30)
+    var_trans_peak_ind, _ = find_peaks(var_transdata.flatten(), prominence=[0.4, 1], height=trans_mean + 0.2,
+                                       distance=30)
     var_rot_peak_ind, _ = find_peaks(var_rotdata.flatten(), height=0.5, prominence=[0.5, 1])
 
-    var_trans_peak_indcwt = find_peaks_cwt(var_transdata.flatten(), widths=np.arange(10,50))
-    var_rot_peak_indcwt = find_peaks_cwt(var_rotdata.flatten(), widths=np.arange(50,100))
+    var_trans_peak_indcwt = find_peaks_cwt(var_transdata.flatten(), widths=np.arange(10, 50))
+    var_rot_peak_indcwt = find_peaks_cwt(var_rotdata.flatten(), widths=np.arange(50, 100))
 
     return var_trans_peak_ind, var_trans_peak_indcwt, var_rot_peak_ind, var_rot_peak_indcwt
 
@@ -250,14 +254,15 @@ def find_var_peak(var_transdata, var_rotdata):
 def write_excel(sheetname, data, colp):
     sheetname.write_column(2, colp, data)
 
+
 def segment_connect_acc(start_ind, end_ind, distance, axnum):
     for segments in range(len(end_ind)):
         start_point = start_ind[segments]
         end_point = end_ind[segments]
-        axnum.plot(start_point+1, distance[start_point+1], "ro", ms=5,label= 'Ground Truth')
-        axnum.plot(end_point+1, distance[end_point+1], "mo", ms=5)
-        connectx = [start_point+1, end_point+1]
-        connecty = [distance[start_point+1], distance[end_point+1]]
+        axnum.plot(start_point + 1, distance[start_point + 1], "ro", ms=5, label='Ground Truth')
+        axnum.plot(end_point + 1, distance[end_point + 1], "mo", ms=5)
+        connectx = [start_point + 1, end_point + 1]
+        connecty = [distance[start_point + 1], distance[end_point + 1]]
         axnum.plot(connectx, connecty, 'm--')
 
 
@@ -307,17 +312,17 @@ def get_kinematic_data():
         for line in column[37]:
             grip_vright.append(line)
     print(len(translation_left) / 3)
-    return translation_left, rotation_left, trans_vleft,\
-           translation_right, rotation_right, trans_vright
+    return translation_left, rotation_left, trans_vleft, \
+        translation_right, rotation_right, trans_vright
 
 
 def data_filters(trans_data, rot_data, trans_vdata):
     trans_data, trans_v_data = KALMAN_filter(trans_data, trans_vdata, 6)
-    eudist_norm, dist_rot_norm\
+    eudist_norm, dist_rot_norm \
         = trans_rot_eudistance(trans_data, rot_data)
     # dist_rot_norm = np.concatenate((dist_rot_norm_l, dist_rot_norm_r), axis=1)
     dist_rot_filter = sav_filter(dist_rot_norm, 321, 1)
-    eudist_filter = sav_filter(eudist_norm, 59,2)
+    eudist_filter = sav_filter(eudist_norm, 59, 2)
     return eudist_filter, dist_rot_filter
 
 
@@ -333,24 +338,22 @@ def trans_rot_eudistance(trans, rot):
     return eudistance_norm, distance_rot_norm
 
 
-def plot_figs(indxdata_dict, trans_data_dict, fig_name, fig_path):
-    fig = plt.figure(figsize=(40,15))
+def plot_figs(indxdata_dict, data_dict, fig_name, fig_path):
+    fig = plt.figure(figsize=(40, 15), dpi=600)
     i = 0
-    for dict1, dict2 in zip(indxdata_dict.items(),trans_data_dict.items() ):
-        ax = fig.add_subplot(2,2,i+1)
-        plt.plot(dict2[1][10:], color='#6495ED')
-        a = [dict1[0]]
-        plt.legend(a, fontsize=20)
-        ax.plot(dict1[1], dict2[1][dict1[1]], "xr", ms=8)
-        segment_connect(start_timestamp, end_timestamp, dict2[1], ax)
-
-        plt.xlabel('frame', fontsize=20)
-        plt.ylabel('normalized distance', fontsize=20)
+    for dict1, dict2 in zip(indxdata_dict.items(), data_dict.items()):
+        ax = fig.add_subplot(2, 2, i + 1)
+        k_line, = plt.plot(dict2[1][5:], color='#6495ED')
+        estimate, = ax.plot(dict1[1], dict2[1][dict1[1]], "xr", ms=8)
+        connect_line, ground_truth = segment_connect(start_timestamp, end_timestamp, dict2[1], ax)
+        plt.legend([k_line, estimate, ground_truth], [dict1[0], "estimated points", "ground truth points"], fontsize=15)
+        ax.tick_params(axis='both', labelsize=20)
+        plt.xlabel('frame', fontsize=25)
+        plt.ylabel('normalized distance', fontsize=25)
         i += 1
     plt.savefig(fig_path + fig_name[0:-4])
     plt.clf()
     plt.close()
-
 
 
 ############################################
@@ -366,17 +369,16 @@ if __name__ == '__main__':
             # build files/dir if not exist
             os.makedirs(dst)
 
-    fileName = "./result file/potensial segment points.xls"  # 工作簿名字
+    fileName = "./result file/potensial segment points.xlsx"  # 工作簿名字
     workbook = xw.Workbook(fileName)
 
-
-    tasks = ['Suturing', 'Needle Passing', 'Knot Tying']
+    tasks = ['Suturing', 'Needle_Passing', 'Knot_Tying']
     for task in tasks:
         rootPath = homepath + task + '/'
         filePath = rootPath + "kinematics/AllGestures/"
         gesture_filename = os.listdir(filePath)
         gesture_filename.sort()
-  # 创建工作簿
+        # 创建工作簿
 
         for kinematics_file in gesture_filename[::10]:
             print(kinematics_file)
@@ -386,7 +388,7 @@ if __name__ == '__main__':
             translation_l, rotation_l, trans_vl, translation_r, rotation_r, trans_vr = get_kinematic_data()
 
             eudist_norm_l, dist_rot_norm_l = data_filters(translation_l, rotation_l, trans_vl)
-            dist_rot_norm_r,eudist_norm_r =  data_filters(translation_r, rotation_r, trans_vr)
+            dist_rot_norm_r, eudist_norm_r = data_filters(translation_r, rotation_r, trans_vr)
 
             ''' ################ trans_index, trans_index_cwt, rot_index, rot_index_cwt ##################'''
             trans_peakl_ind, trans_peakl_indcwt, rot_peakl_ind, rot_peakl_indcwt = find_org_peaks(eudist_norm_l,
@@ -400,23 +402,23 @@ if __name__ == '__main__':
             negrot_norm_r = max_min_norm((-dist_rot_norm_r).reshape(-1, 1))
 
             trans_peakl_ind1, trans_peakl_indcwt1, rot_peakl_ind1, rot_peakl_indcwt1 \
-                = find_neg_org_peaks(negeudist_norm_l,negrot_norm_l)
+                = find_neg_org_peaks(negeudist_norm_l, negrot_norm_l)
             trans_peakr_ind1, trans_peakr_indcwt1, rot_peakr_ind1, rot_peakr_indcwt1 \
-                = find_neg_org_peaks(negeudist_norm_r,negrot_norm_r)
+                = find_neg_org_peaks(negeudist_norm_r, negrot_norm_r)
 
-            indxcwt_dict = {"left translation distance cwt":trans_peakl_indcwt,
-                            "right translation distance cwt":trans_peakr_indcwt,
-                            "left rotation distance cwt":rot_peakl_indcwt,
-                            "right rotation distance cwt":rot_peakr_indcwt}
-            indxorg_dict = {"trans_peakl":trans_peakl_ind, "trans_peakr":trans_peakr_ind,
-                            "rot_peakl":rot_peakl_ind,"rot_peakr":rot_peakr_ind}
-            data_dict = {"left translation data":eudist_norm_l,
-                         "right translation data":eudist_norm_r,
+            indxcwt_dict = {"left translation distance cwt": trans_peakl_indcwt,
+                            "right translation distance cwt": trans_peakr_indcwt,
+                            "left rotation distance cwt": rot_peakl_indcwt,
+                            "right rotation distance cwt": rot_peakr_indcwt}
+            indxorg_dict = {"trans_peakl": trans_peakl_ind, "trans_peakr": trans_peakr_ind,
+                            "rot_peakl": rot_peakl_ind, "rot_peakr": rot_peakr_ind}
+            data_dict = {"left translation data": eudist_norm_l,
+                         "right translation data": eudist_norm_r,
                          "left rotation data": dist_rot_norm_l,
                          "right rotation data": dist_rot_norm_r
                          }
             fig_name = kinematics_file[0:-4] + 'org trans rot cwt_'
-            plot_figs(indxcwt_dict, data_dict, fig_name, img_org_path )
+            plot_figs(indxcwt_dict, data_dict, fig_name, img_org_path)
 
             '''##########################          variance-based              ##################'''
             ## define one new frame
@@ -449,13 +451,13 @@ if __name__ == '__main__':
             var_trans_peakr_negind, var_trans_peakr_negindcwt, var_rot_peakr_negind, var_rot_peakr_negindcwt \
                 = find_var_peak(var_transr_negnorm, var_rotr_negnorm)
 
-            var_indx_dict = {"left translation variance cwt":var_trans_peakl_indcwt,
-                            "right translation variance cwt":var_trans_peakr_indcwt,
-                            "negative left variance var cwt":var_trans_peakl_negindcwt,
-                            "negative right variance var cwt":var_trans_peakr_negindcwt}
+            var_indx_dict = {"left translation variance cwt": var_trans_peakl_indcwt,
+                             "right translation variance cwt": var_trans_peakr_indcwt,
+                             "negative left variance var cwt": var_trans_peakl_negindcwt,
+                             "negative right variance var cwt": var_trans_peakr_negindcwt}
 
-            var_data_dict = {"left variance data":var_transl_norm,
-                             "right variance data":var_transr_norm,
+            var_data_dict = {"left variance data": var_transl_norm,
+                             "right variance data": var_transr_norm,
                              "left variance data": var_transl_negnorm,
                              "right variance data": var_transr_negnorm
                              }
@@ -469,20 +471,19 @@ if __name__ == '__main__':
 
             head_data = np.array(
                 ['trans_peakl_ind', 'trans_peakr_ind', 'rot_peakl_ind', 'rot_peakr_ind',
-                'trans_peakl_indcwt', 'trans_peakr_indcwt', 'rot_peakl_indcwt', 'rot_peakr_indcwt', #8
-                'start',
-                'var_rot_peakl_indcwt', 'var_rot_peakl_negindcwt', 'var_rot_peakr_indcwt', 'var_rot_peakr_negindcwt',
-                'var_trans_peakl_indcwt', 'var_trans_peakl_negindcwt', 'var_rot_peakl_ind', 'var_rot_peakl_negind',
-                'var_trans_peakr_indcwt', 'var_trans_peakr_negindcwt', 'var_rot_peakr_ind', 'var_rot_peakr_negind'])
+                 'trans_peakl_indcwt', 'trans_peakr_indcwt', 'rot_peakl_indcwt', 'rot_peakr_indcwt',  # 8
+                 'start',
+                 'var_rot_peakl_indcwt', 'var_rot_peakl_negindcwt', 'var_rot_peakr_indcwt', 'var_rot_peakr_negindcwt',
+                 'var_trans_peakl_indcwt', 'var_trans_peakl_negindcwt', 'var_rot_peakl_ind', 'var_rot_peakl_negind',
+                 'var_trans_peakr_indcwt', 'var_trans_peakr_negindcwt', 'var_rot_peakr_ind', 'var_rot_peakr_negind'])
 
             all_data = [trans_peakl_ind, trans_peakr_ind, rot_peakl_ind, rot_peakr_ind,
-                        trans_peakl_indcwt, trans_peakr_indcwt, rot_peakl_indcwt, rot_peakr_indcwt,  #8
+                        trans_peakl_indcwt, trans_peakr_indcwt, rot_peakl_indcwt, rot_peakr_indcwt,  # 8
                         start_timestamp,
                         var_rot_peakl_indcwt, var_rot_peakl_negindcwt, var_rot_peakr_indcwt, var_rot_peakr_negindcwt,
-                        rot_peakl_indcwt1, rot_peakr_indcwt1,  #14,15
+                        rot_peakl_indcwt1, rot_peakr_indcwt1,  # 14,15
                         var_trans_peakl_indcwt, var_trans_peakl_negindcwt, var_rot_peakl_ind, var_rot_peakl_negind,
                         var_trans_peakr_indcwt, var_trans_peakr_negindcwt, var_rot_peakr_ind, var_rot_peakr_negind]
-
 
             transl_ind = np.concatenate((trans_peakl_ind, trans_peakl_indcwt))
             transr_ind = np.concatenate((trans_peakr_ind, trans_peakr_indcwt))
@@ -494,4 +495,3 @@ if __name__ == '__main__':
             worksheet1.write_row("A1", head_data)
 
     workbook.close()
-
