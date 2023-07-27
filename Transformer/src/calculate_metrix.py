@@ -93,25 +93,30 @@ for label in all_labels_file:
     for ele in range(len(gt_end)):
         list_gt_start_end.append((gt_start[ele], gt_end[ele]))
 
-    # fig, ax = plt.subplots(figsize=(30, 5))
-    # ax.broken_barh(list_start_end, [10, 0.5], facecolor=tuple(list_pre_color))
-    # for idx, t in enumerate(pre_start):
-    #     plt.text(t + 10, 10.5, 'G%d' % plt_label[idx], color='k', fontsize=12)
-    #
-    # ax.broken_barh(list_gt_start_end, [11, 0.5], facecolor=tuple(list_gt_color))
-    # for idx, t in enumerate(gt_start):
-    #     plt.text(t + 10, 11.5, 'G%d' % plt_gtlabel[idx], color='k', fontsize=12)
-    #
-    # plt.ylim(9.5, 12)
-    # plt.xlim(0, pre_end[-1])
-    # plt.xlabel('frame',fontsize = 20)
-    #
-    # ax.set_title('Final result for estimated segment points + Transformer based model : '+ label[15:-4],fontsize = 18)
-    # ax.set_yticks([10.5, 11.5])
-    # ax.set_yticklabels(['Final result', 'Ground truth'],fontsize = 20)
-    # plt.savefig('D:/J/Transformer_mix/classification figure/' + label[:-4] + '.png')
-    # plt.cla()
-    # plt.close("all")
+    """  ######################     plot for segmentation result   #################"""
+
+
+    fig, ax = plt.subplots(figsize=(30, 15))
+    ax.broken_barh(list_start_end, [10, 0.5], facecolor=tuple(list_pre_color))
+    for idx, t in enumerate(pre_start):
+        plt.text(t + 10, 10.5, 'G%d' % plt_label[idx], color='k', fontsize=20)
+
+    ax.broken_barh(list_gt_start_end, [11, 0.5], facecolor=tuple(list_gt_color))
+    for idx, t in enumerate(gt_start):
+        plt.text(t + 10, 11.5, 'G%d' % plt_gtlabel[idx], color='k', fontsize=20)
+
+    plt.ylim(9.5, 12)
+    plt.xlim(0, pre_end[-1])
+    plt.xlabel('frame',fontsize = 25)
+
+    ax.set_title('Final result for estimated segment points + Transformer based model : '+ label[15:-4],fontsize = 25)
+    ax.set_yticks([10.5, 11.5])
+    ax.set_yticklabels(['Final result', 'Ground truth'],fontsize = 20)
+    plt.savefig('D:/J/Transformer_mix/classification figure/' + label[:-4] + '.png')
+    plt.cla()
+    plt.close("all")
+
+    """  #####################     plot for segmentation result   ###########################"""
 
 # print(all_precision)
 # print(all_recall)
@@ -147,7 +152,7 @@ cm = confusion_matrix(all_true, all_predict)
 np.set_printoptions(precision=4)
 cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
 print (cm_normalized)
-plt.figure(figsize=(15, 15), dpi=120)
+plt.figure(figsize=(15, 15), dpi=300)
 
 ind_array = np.arange(len(labels))
 x, y = np.meshgrid(ind_array, ind_array)
